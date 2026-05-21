@@ -1,15 +1,31 @@
+import os
+import cv2
 import mediapipe as mp
-from config import settings
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+
 
 class FaceAnalyzer:
     def __init__(self):
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=settings.MIN_DETECTION_CONFIDENCE,
-            min_tracking_confidence=settings.MIN_TRACKING_CONFIDENCE
-        )
+        # Configurar las opciones del detector de malla facial moderna
+        model_path = os.path.join(os.getcwd(), "face_landmarker.task")
 
-    def procesar_frame(self, frame_rgb):
-        return self.face_mesh.process(frame_rgb)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"No se encontró el archivo del modelo en: {model_path}. Por favor descárgalo con wget.")
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False,
+            num_faces=1
+        )
+        # Crear el detector
+        self.detector = vision.FaceLandmarker.create_from_options(options)
+
+    def procesar_frame(self, frame_bgr):
+        # La nueva API procesa directamente imágenes en el formato de MediaPipe
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_bgr)
+        resultado = self.detector.detect(mp_image)
+        return resultado
