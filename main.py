@@ -1,4 +1,5 @@
 import cv2
+import time
 
 from config import settings
 
@@ -9,6 +10,7 @@ from src.core.geometry import calcular_distancia
 from src.core.fatigue_logic import FatigueMonitor
 
 from src.alerts.local_alerts import lanzar_alerta_sonora
+
 
 from src.storage.logger import (
     inicializar_csv,
@@ -36,6 +38,15 @@ monitor = FatigueMonitor(
 
 # Crear CSV automáticamente
 inicializar_csv()
+
+
+ultimo_sonido = 0
+
+ultimo_guardado = 0
+
+TIEMPO_ENTRE_SONIDOS = 3
+
+TIEMPO_ENTRE_GUARDADOS = 5
 
 # =========================================
 # Bucle principal
@@ -90,9 +101,7 @@ while True:
                 abajo_der
             )
 
-            promedio = (
-                dist_izq + dist_der
-            ) / 2
+            promedio = (dist_izq + dist_der) / 2
 
             # =========================================
             # Evaluar fatiga
@@ -117,7 +126,7 @@ while True:
                     frame,
                     (x, y),
                     1,
-                    (0,255,0),
+                    (255, 255, 255),
                     -1
                 )
 
@@ -130,8 +139,8 @@ while True:
                 f"Apertura: {promedio:.3f}",
                 (20, 200),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255,255,255),
+                0.7,
+                (0,255,255),
                 2
             )
 
@@ -141,14 +150,30 @@ while True:
 
             if estado == "CRITICO":
 
-                lanzar_alerta_sonora()
+                tiempo_actual = time.time()
 
-                monitor.incrementar_alerta()
+                # SONIDO CONTROLADO
+                if (
+                        tiempo_actual - ultimo_sonido
+                        > TIEMPO_ENTRE_SONIDOS
+                ):
+                    lanzar_alerta_sonora()
 
-                guardar_incidente(
-                    estado,
-                    tiempo
-                )
+                    ultimo_sonido = tiempo_actual
+
+                # ALERTAS CONTROLADAS
+                if (
+                        tiempo_actual - ultimo_guardado
+                        > TIEMPO_ENTRE_GUARDADOS
+                ):
+                    monitor.incrementar_alerta()
+
+                    guardar_incidente(
+                        estado,
+                        tiempo
+                    )
+
+                    ultimo_guardado = tiempo_actual
 
     # =========================================
     # Interfaz visual

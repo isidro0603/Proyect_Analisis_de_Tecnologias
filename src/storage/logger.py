@@ -12,10 +12,11 @@ ARCHIVO = os.path.join(
 
 def inicializar_csv():
 
-    # Crear carpeta automáticamente
-    os.makedirs(CARPETA, exist_ok=True)
+    os.makedirs(
+        CARPETA,
+        exist_ok=True
+    )
 
-    # Crear archivo CSV si no existe
     if not os.path.exists(ARCHIVO):
 
         with open(
@@ -29,12 +30,12 @@ def inicializar_csv():
             writer.writerow([
                 "fecha",
                 "hora",
-                "estado",
+                "evento",
                 "duracion"
             ])
 
 def guardar_incidente(
-    estado,
+    evento,
     duracion
 ):
 
@@ -51,6 +52,6 @@ def guardar_incidente(
         writer.writerow([
             ahora.date(),
             ahora.strftime("%H:%M:%S"),
-            estado,
+            evento,
             round(duracion, 2)
         ])

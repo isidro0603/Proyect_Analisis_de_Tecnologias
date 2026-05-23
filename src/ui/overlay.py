@@ -2,20 +2,23 @@ import cv2
 
 def dibujar_estado(frame, estado):
 
-    color = (0,255,0)
+    color = (0,200,0)
 
     if estado == "ADVERTENCIA":
-        color = (0,255,255)
+        color = (0,200,255)
 
     elif estado == "CRITICO":
-        color = (0,0,255)
+        color = (0,0,200)
 
+# para cambiara las letra sen 0.7
+# en 20 y 40 es para mover texto
+# el 1 es el grosor
     cv2.putText(
         frame,
         f"Estado: {estado}",
         (20,40),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1,
+        0.7,
         color,
         2
     )
@@ -34,7 +37,7 @@ def dibujar_alertas(frame, total):
 
 def dibujar_barra(frame, nivel):
 
-    ancho = int(200 * nivel)
+    ancho = int(120 * nivel)
 
     cv2.rectangle(
         frame,
@@ -47,7 +50,7 @@ def dibujar_barra(frame, nivel):
     cv2.rectangle(
         frame,
         (20,120),
-        (20 + ancho,150),
-        (0,0,255),
+        (20 + ancho,140),
+        (0,165,255),
         -1
     )
