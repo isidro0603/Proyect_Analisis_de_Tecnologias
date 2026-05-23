@@ -1,99 +1,197 @@
 import cv2
-import time
+
 from config import settings
+
 from src.hardware.camera import LaptopCamera
+
 from src.core.detector import FaceAnalyzer
 from src.core.geometry import calcular_distancia
+from src.core.fatigue_logic import FatigueMonitor
+
 from src.alerts.local_alerts import lanzar_alerta_sonora
 
-# Inicialización de componentes
+from src.storage.logger import (
+    inicializar_csv,
+    guardar_incidente
+)
+
+from src.ui.overlay import (
+    dibujar_estado,
+    dibujar_alertas,
+    dibujar_barra
+)
+
+# =========================================
+# Inicialización
+# =========================================
+
 camara = LaptopCamera(device_index=0)
+
 analyzer = FaceAnalyzer()
 
-ojos_cerrados_inicio = None
+monitor = FatigueMonitor(
+    settings.UMBRAL_APERTURA_OJOS,
+    settings.TIEMPO_LIMITE_ALERTA
+)
+
+# Crear CSV automáticamente
+inicializar_csv()
+
+# =========================================
+# Bucle principal
+# =========================================
 
 while True:
-    exito, frame = camara.obtain_frame() if hasattr(camara, 'obtain_frame') else camara.obtener_frame()
+
+    exito, frame = camara.obtener_frame()
+
     if not exito:
-        print("Error al obtener el flujo de video.")
+        print("Error al obtener video.")
         break
 
-    # Procesamiento Analítico (La nueva API prefiere BGR directamente o el formato convertido internamente)
     resultados = analyzer.procesar_frame(frame)
 
-    # NUEVA ESTRUCTURA: Verificar si se detectaron rostros
+    estado = "NORMAL"
+    tiempo = 0
+
+    # =========================================
+    # Detección facial
+    # =========================================
+
     if resultados and resultados.face_landmarks:
 
-        # Iteramos sobre los rostros detectados (usualmente 1 por tu configuración)
         for rostro_landmarks in resultados.face_landmarks:
 
-            # En la nueva API, 'rostro_landmarks' ya es la lista de puntos (puntos[159], etc.)
+            # ---------------------------------
             # Ojo izquierdo
+            # ---------------------------------
+
             arriba_izq = rostro_landmarks[159]
             abajo_izq = rostro_landmarks[145]
 
+            # ---------------------------------
             # Ojo derecho
+            # ---------------------------------
+
             arriba_der = rostro_landmarks[386]
             abajo_der = rostro_landmarks[374]
 
-            # Cálculos geométricos
-            dist_izq = calcular_distancia(arriba_izq, abajo_izq)
-            dist_der = calcular_distancia(arriba_der, abajo_der)
-            promedio = (dist_izq + dist_der) / 2
+            # ---------------------------------
+            # Distancias
+            # ---------------------------------
 
-            # Desplegar información en el frame
+            dist_izq = calcular_distancia(
+                arriba_izq,
+                abajo_izq
+            )
+
+            dist_der = calcular_distancia(
+                arriba_der,
+                abajo_der
+            )
+
+            promedio = (
+                dist_izq + dist_der
+            ) / 2
+
+            # =========================================
+            # Evaluar fatiga
+            # =========================================
+
+            estado, tiempo = monitor.evaluar(
+                promedio
+            )
+
+            # =========================================
+            # Dibujar landmarks
+            # =========================================
+
+            h, w, _ = frame.shape
+
+            for punto in rostro_landmarks:
+
+                x = int(punto.x * w)
+                y = int(punto.y * h)
+
+                cv2.circle(
+                    frame,
+                    (x, y),
+                    1,
+                    (0,255,0),
+                    -1
+                )
+
+            # =========================================
+            # Mostrar apertura de ojos
+            # =========================================
+
             cv2.putText(
                 frame,
-                f"Apertura ojos: {promedio:.3f}",
-                (20, 40),
+                f"Apertura: {promedio:.3f}",
+                (20, 200),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
+                0.8,
+                (255,255,255),
                 2
             )
 
-            # Lógica de Alertas e Incidentes (Mitigación de Riesgos)
-            if promedio < settings.UMBRAL_APERTURA_OJOS:
-                if ojos_cerrados_inicio is None:
-                    ojos_cerrados_inicio = time.time()  # Inicia el cronómetro
+            # =========================================
+            # ALERTA CRÍTICA
+            # =========================================
 
-                # Calculamos el tiempo transcurrido en CADA frame mientras los ojos sigan cerrados
-                tiempo_transcurrido = time.time() - ojos_cerrados_inicio
+            if estado == "CRITICO":
 
-                # Alerta visual preventiva + Contador de segundos
-                cv2.putText(
-                    frame,
-                    f"Abre los ojos! ({tiempo_transcurrido:.1f}s)",
-                    (20, 90),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 0, 255),
-                    3
+                lanzar_alerta_sonora()
+
+                monitor.incrementar_alerta()
+
+                guardar_incidente(
+                    estado,
+                    tiempo
                 )
 
-                # Si supera el umbral crítico (ej. 2 segundos), se dispara la respuesta operativa
-                if tiempo_transcurrido >= settings.TIEMPO_LIMITE_ALERTA:
-                    cv2.putText(
-                        frame,
-                        "ALERTA CRITICA!!!",
-                        (20, 140),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.5,
-                        (0, 0, 255),
-                        4
-                    )
-                    lanzar_alerta_sonora()
-            else:
-                # Si abres los ojos, el cronómetro se reinicia a cero inmediatamente
-                ojos_cerrados_inicio = None
+    # =========================================
+    # Interfaz visual
+    # =========================================
 
-    # Interfaz de usuario (UI)
-    cv2.imshow("Sistema Anti-Sueno - Control Operativo", frame)
+    dibujar_estado(
+        frame,
+        estado
+    )
 
-    # Tecla ESC para salir
+    dibujar_alertas(
+        frame,
+        monitor.total_alertas
+    )
+
+    # Barra de fatiga
+    nivel = min(
+        tiempo / settings.TIEMPO_LIMITE_ALERTA,
+        1
+    )
+
+    dibujar_barra(
+        frame,
+        nivel
+    )
+
+    # =========================================
+    # Mostrar ventana
+    # =========================================
+
+    cv2.imshow(
+        "Sistema Inteligente de Fatiga",
+        frame
+    )
+
+    # ESC para salir
     if cv2.waitKey(1) == 27:
         break
 
-# Cierre limpio del sistema
+# =========================================
+# Cierre limpio
+# =========================================
+
 camara.liberar()
+
 cv2.destroyAllWindows()
