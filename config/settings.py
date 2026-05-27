@@ -4,7 +4,7 @@ MIN_TRACKING_CONFIDENCE = 0.5
 
 # Umbrales de riesgo (Segun Evidencia científica)
 UMBRAL_APERTURA_OJOS = 0.015
-TIEMPO_LIMITE_ALERTA = 2  # segundos, probar intervalos
+TIEMPO_LIMITE_ALERTA = 1.7  # segundos, probar intervalos
 
 
 # Frecuencia de alertas Alertas

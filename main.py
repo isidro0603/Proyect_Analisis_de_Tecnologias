@@ -60,7 +60,39 @@ while True:
         print("Error al obtener video.")
         break
 
-    resultados = analyzer.procesar_frame(frame)
+    # =========================================
+    # MODO NOCTURNO
+    # =========================================
+
+    # Escala de grises
+    gris = cv2.cvtColor(
+        frame,
+        cv2.COLOR_BGR2GRAY
+    )
+
+    # Mejorar contraste
+    gris = cv2.equalizeHist(gris)
+
+    # Aumentar brillo
+    gris = cv2.convertScaleAbs(
+        gris,
+        alpha=1.5,
+        beta=30
+    )
+
+    # Convertir a BGR para MediaPipe
+    frame_nocturno = cv2.cvtColor(
+        gris,
+        cv2.COLOR_GRAY2BGR
+    )
+
+    # Procesamiento facial
+    resultados = analyzer.procesar_frame(
+        frame_nocturno
+    )
+
+    # Mostrar modo nocturno
+    frame = frame_nocturno
 
     estado = "NORMAL"
     tiempo = 0
@@ -140,7 +172,7 @@ while True:
                 (20, 200),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (0,255,255),
+                (0,0,0),
                 2
             )
 
