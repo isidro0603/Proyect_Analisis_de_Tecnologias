@@ -11,7 +11,7 @@ from src.core.fatigue_logic import FatigueMonitor
 
 from src.alerts.local_alerts import (
     lanzar_alerta_sonora,
-    enviar_todo_al_servidor  # 📌 1. IMPORTAMOS LA FUNCIÓN DE ENVÍO FINAL
+    enviar_todo_al_servidor  #  1. IMPORTAMOS LA FUNCIÓN DE ENVÍO FINAL
 )
 
 from src.storage.logger import (
@@ -187,17 +187,17 @@ try:
         )
 
         if cv2.waitKey(1) == 27:
-            print("\n🛑 Se presionó ESC. Cerrando sistema...")
+            print("\n Se presionó ESC. Cerrando sistema...")
             break
 
 except KeyboardInterrupt:
-    print("\n🛑 Se detectó Ctrl+C. Deteniendo sistema...")
+    print("\n Se detectó Ctrl+C. Deteniendo sistema...")
 
 finally:
 
-    print("🔌 Liberando cámara...")
+    print(" Liberando cámara...")
     camara.liberar()
     cv2.destroyAllWindows()
 
     enviar_todo_al_servidor()
-    print("👋 Programa finalizado con éxito.")
+    print(" Programa finalizado con éxito.")
