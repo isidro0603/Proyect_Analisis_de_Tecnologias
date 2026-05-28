@@ -1,0 +1,3 @@
+vehiculo_id,fecha_hora,evento,duracion_segundos
+UABC-01,2026-05-28 12:43:16,Fatiga detectada,1.73
+UABC-01,2026-05-28 12:43:20,Fatiga detectada,1.73

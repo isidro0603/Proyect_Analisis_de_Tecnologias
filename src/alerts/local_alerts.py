@@ -33,18 +33,18 @@ def registrar_alerta_en_memoria(duracion_ojos_cerrados):
         "duracion_segundos": round(duracion_ojos_cerrados, 2)
     }
     historial_local.append(evento)
-    print(f"📦 Alerta guardada localmente (Total acumulado: {len(historial_local)})")
+    print(f" Alerta guardada localmente (Total acumulado: {len(historial_local)})")
 
 
 def enviar_todo_al_servidor():
     if not historial_local:
-        print("\n🛑 Saliendo... No se generaron alertas en esta sesión.")
+        print("\n Saliendo... No se generaron alertas en esta sesión.")
         return
 
-    print(f"\n📡 Enviando {len(historial_local)} incidentes acumulados al servidor...")
+    print(f"\n Enviando {len(historial_local)} incidentes acumulados al servidor...")
     try:
         response = requests.post(URL_API, json=historial_local, timeout=5)
         if response.status_code == 201:
-            print("💾 ¡Exito! Todos los datos fueron recibidos y guardados por el servidor.")
+            print(" ¡Exito! Todos los datos fueron recibidos y guardados por el servidor.")
     except requests.exceptions.RequestException:
         print("Error: No se pudo conectar con el servidor. Los datos no se guardaron.")
