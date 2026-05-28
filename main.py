@@ -9,8 +9,10 @@ from src.core.detector import FaceAnalyzer
 from src.core.geometry import calcular_distancia
 from src.core.fatigue_logic import FatigueMonitor
 
-from src.alerts.local_alerts import lanzar_alerta_sonora
-
+from src.alerts.local_alerts import (
+    lanzar_alerta_sonora,
+    enviar_todo_al_servidor  # 📌 1. IMPORTAMOS LA FUNCIÓN DE ENVÍO FINAL
+)
 
 from src.storage.logger import (
     inicializar_csv,
@@ -48,207 +50,154 @@ TIEMPO_ENTRE_SONIDOS = 3
 
 TIEMPO_ENTRE_GUARDADOS = 5
 
-# =========================================
-# Bucle principal
-# =========================================
+try:
+    while True:
 
-while True:
+        exito, frame = camara.obtener_frame()
 
-    exito, frame = camara.obtener_frame()
+        if not exito:
+            print("Error al obtener video.")
+            break
 
-    if not exito:
-        print("Error al obtener video.")
-        break
+        gris = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2GRAY
+        )
 
-    # =========================================
-    # MODO NOCTURNO
-    # =========================================
+        gris = cv2.equalizeHist(gris)
 
-    # Escala de grises
-    gris = cv2.cvtColor(
-        frame,
-        cv2.COLOR_BGR2GRAY
-    )
+        gris = cv2.convertScaleAbs(
+            gris,
+            alpha=1.5,
+            beta=30
+        )
 
-    # Mejorar contraste
-    gris = cv2.equalizeHist(gris)
+        frame_nocturno = cv2.cvtColor(
+            gris,
+            cv2.COLOR_GRAY2BGR
+        )
 
-    # Aumentar brillo
-    gris = cv2.convertScaleAbs(
-        gris,
-        alpha=1.5,
-        beta=30
-    )
+        resultados = analyzer.procesar_frame(
+            frame_nocturno
+        )
 
-    # Convertir a BGR para MediaPipe
-    frame_nocturno = cv2.cvtColor(
-        gris,
-        cv2.COLOR_GRAY2BGR
-    )
+        frame = frame_nocturno
 
-    # Procesamiento facial
-    resultados = analyzer.procesar_frame(
-        frame_nocturno
-    )
+        estado = "NORMAL"
+        tiempo = 0
 
-    # Mostrar modo nocturno
-    frame = frame_nocturno
+        if resultados and resultados.face_landmarks:
 
-    estado = "NORMAL"
-    tiempo = 0
+            for rostro_landmarks in resultados.face_landmarks:
 
-    # =========================================
-    # Detección facial
-    # =========================================
+                arriba_izq = rostro_landmarks[159]
+                abajo_izq = rostro_landmarks[145]
 
-    if resultados and resultados.face_landmarks:
+                arriba_der = rostro_landmarks[386]
+                abajo_der = rostro_landmarks[374]
 
-        for rostro_landmarks in resultados.face_landmarks:
-
-            # ---------------------------------
-            # Ojo izquierdo
-            # ---------------------------------
-
-            arriba_izq = rostro_landmarks[159]
-            abajo_izq = rostro_landmarks[145]
-
-            # ---------------------------------
-            # Ojo derecho
-            # ---------------------------------
-
-            arriba_der = rostro_landmarks[386]
-            abajo_der = rostro_landmarks[374]
-
-            # ---------------------------------
-            # Distancias
-            # ---------------------------------
-
-            dist_izq = calcular_distancia(
-                arriba_izq,
-                abajo_izq
-            )
-
-            dist_der = calcular_distancia(
-                arriba_der,
-                abajo_der
-            )
-
-            promedio = (dist_izq + dist_der) / 2
-
-            # =========================================
-            # Evaluar fatiga
-            # =========================================
-
-            estado, tiempo = monitor.evaluar(
-                promedio
-            )
-
-            # =========================================
-            # Dibujar landmarks
-            # =========================================
-
-            h, w, _ = frame.shape
-
-            for punto in rostro_landmarks:
-
-                x = int(punto.x * w)
-                y = int(punto.y * h)
-
-                cv2.circle(
-                    frame,
-                    (x, y),
-                    1,
-                    (255, 255, 255),
-                    -1
+                dist_izq = calcular_distancia(
+                    arriba_izq,
+                    abajo_izq
                 )
 
-            # =========================================
-            # Mostrar apertura de ojos
-            # =========================================
+                dist_der = calcular_distancia(
+                    arriba_der,
+                    abajo_der
+                )
 
-            cv2.putText(
-                frame,
-                f"Apertura: {promedio:.3f}",
-                (20, 200),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0,0,0),
-                2
-            )
+                promedio = (dist_izq + dist_der) / 2
 
-            # =========================================
-            # ALERTA CRÍTICA
-            # =========================================
+                estado, tiempo = monitor.evaluar(
+                    promedio
+                )
 
-            if estado == "CRITICO":
+                h, w, _ = frame.shape
 
-                tiempo_actual = time.time()
+                for punto in rostro_landmarks:
 
-                # SONIDO CONTROLADO
-                if (
-                        tiempo_actual - ultimo_sonido
-                        > TIEMPO_ENTRE_SONIDOS
-                ):
-                    lanzar_alerta_sonora()
+                    x = int(punto.x * w)
+                    y = int(punto.y * h)
 
-                    ultimo_sonido = tiempo_actual
-
-                # ALERTAS CONTROLADAS
-                if (
-                        tiempo_actual - ultimo_guardado
-                        > TIEMPO_ENTRE_GUARDADOS
-                ):
-                    monitor.incrementar_alerta()
-
-                    guardar_incidente(
-                        estado,
-                        tiempo
+                    cv2.circle(
+                        frame,
+                        (x, y),
+                        1,
+                        (255, 255, 255),
+                        -1
                     )
 
-                    ultimo_guardado = tiempo_actual
+                cv2.putText(
+                    frame,
+                    f"Apertura: {promedio:.3f}",
+                    (20, 200),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0,0,0),
+                    2
+                )
 
-    # =========================================
-    # Interfaz visual
-    # =========================================
+                if estado == "CRITICO":
 
-    dibujar_estado(
-        frame,
-        estado
-    )
+                    tiempo_actual = time.time()
 
-    dibujar_alertas(
-        frame,
-        monitor.total_alertas
-    )
+                    if (
+                            tiempo_actual - ultimo_sonido
+                            > TIEMPO_ENTRE_SONIDOS
+                    ):
+                        lanzar_alerta_sonora()
 
-    # Barra de fatiga
-    nivel = min(
-        tiempo / settings.TIEMPO_LIMITE_ALERTA,
-        1
-    )
+                        ultimo_sonido = tiempo_actual
 
-    dibujar_barra(
-        frame,
-        nivel
-    )
+                    if (
+                            tiempo_actual - ultimo_guardado
+                            > TIEMPO_ENTRE_GUARDADOS
+                    ):
+                        monitor.incrementar_alerta()
 
-    # =========================================
-    # Mostrar ventana
-    # =========================================
+                        guardar_incidente(
+                            estado,
+                            tiempo
+                        )
 
-    cv2.imshow(
-        "Sistema Inteligente de Fatiga",
-        frame
-    )
+                        ultimo_guardado = tiempo_actual
+        dibujar_estado(
+            frame,
+            estado
+        )
 
-    # ESC para salir
-    if cv2.waitKey(1) == 27:
-        break
+        dibujar_alertas(
+            frame,
+            monitor.total_alertas
+        )
 
-# =========================================
-# Cierre limpio
-# =========================================
+        nivel = min(
+            tiempo / settings.TIEMPO_LIMITE_ALERTA,
+            1
+        )
 
-camara.liberar()
+        dibujar_barra(
+            frame,
+            nivel
+        )
 
-cv2.destroyAllWindows()
+        cv2.imshow(
+            "Sistema Inteligente de Fatiga",
+            frame
+        )
+
+        if cv2.waitKey(1) == 27:
+            print("\n🛑 Se presionó ESC. Cerrando sistema...")
+            break
+
+except KeyboardInterrupt:
+    print("\n🛑 Se detectó Ctrl+C. Deteniendo sistema...")
+
+finally:
+
+    print("🔌 Liberando cámara...")
+    camara.liberar()
+    cv2.destroyAllWindows()
+
+    enviar_todo_al_servidor()
+    print("👋 Programa finalizado con éxito.")
